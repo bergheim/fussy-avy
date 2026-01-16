@@ -266,6 +266,27 @@ Fuzzy matches (score > 0) use `fussy-avy-match-fuzzy' face."
 
 ;;; Input Loop
 
+(defun fussy-avy--format-prompt (input matches)
+  "Format the prompt showing INPUT, match count, and best match text."
+  (let* ((match-count (length matches))
+         (count-str (format "%d" match-count)))
+    (if (and matches (> (length input) 0))
+        (let* ((best-match (car matches))
+               (pos (nth 0 best-match))
+               (window (nth 1 best-match))
+               (score (nth 2 best-match))
+               ;; Get a bit more context than just input length
+               (preview-len (min 20 (+ (length input) 5)))
+               (matched-text (fussy-avy--get-buffer-text-at pos preview-len window))
+               ;; Truncate if too long
+               (display-text (if (> (length matched-text) 15)
+                                 (concat (substring matched-text 0 12) "...")
+                               matched-text))
+               (score-indicator (if (= score 0) "" (format "~%d" score))))
+          (format "Fussy [%s%s '%s']: %s"
+                  count-str score-indicator display-text input))
+      (format "Fussy [%s]: %s" count-str input))))
+
 (defun fussy-avy--read-input-with-highlights ()
   "Read input showing live highlights. Returns (input . matches)."
   (let ((input "")
@@ -276,9 +297,7 @@ Fuzzy matches (score > 0) use `fussy-avy-match-fuzzy' face."
           (while continue
             (setq matches (fussy-avy--find-matches input))
             (fussy-avy--update-overlays matches (length input))
-            (let* ((match-count (length matches))
-                   (prompt (format "Fussy avy [%d]: %s"
-                                   match-count input))
+            (let* ((prompt (fussy-avy--format-prompt input matches))
                    (char (read-char prompt nil fussy-avy-timeout)))
               (cond
                ;; Timeout - we're done

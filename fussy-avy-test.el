@@ -226,6 +226,34 @@
       ;; Fuzzy match should have score > 0
       (should (> (fussy-avy-test--match-score (car matches)) 0)))))
 
+;;; Prompt Formatting Tests
+
+(ert-deftest fussy-avy-test-prompt-no-matches ()
+  "Prompt with no matches shows count only."
+  (let ((prompt (fussy-avy--format-prompt "xyz" nil)))
+    (should (string-match-p "\\[0\\]" prompt))
+    (should (string-match-p "xyz" prompt))))
+
+(ert-deftest fussy-avy-test-prompt-with-matches ()
+  "Prompt with matches shows count and preview."
+  (fussy-avy-test--with-buffer "foobar baz"
+    (let* ((matches (fussy-avy--find-matches "foo"))
+           (prompt (fussy-avy--format-prompt "foo" matches)))
+      ;; Should show count
+      (should (string-match-p "\\[1" prompt))
+      ;; Should show preview of matched text
+      (should (string-match-p "foobar" prompt))
+      ;; Should show input
+      (should (string-match-p "foo" prompt)))))
+
+(ert-deftest fussy-avy-test-prompt-fuzzy-shows-score ()
+  "Prompt shows score indicator for fuzzy matches."
+  (fussy-avy-test--with-buffer "foobar baz"
+    (let* ((matches (fussy-avy--find-matches "footar"))
+           (prompt (fussy-avy--format-prompt "footar" matches)))
+      ;; Should show score indicator ~1
+      (should (string-match-p "~1" prompt)))))
+
 ;;; Max Forgiving Mode Tests
 
 (ert-deftest fussy-avy-test-max-forgiving-mode ()
