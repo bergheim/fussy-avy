@@ -42,6 +42,12 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 
 ;; Timeout between keystrokes (default: avy-timeout-seconds)
 (setq fussy-avy-timeout 0.5)
+
+;; Search in all windows (default: t)
+;; nil = only current window
+;; t = all windows on current frame
+;; 'all-frames = all windows on all frames
+(setq fussy-avy-all-windows t)
 #+end_src
 
 For more forgiving matching:
@@ -57,6 +63,36 @@ For more forgiving matching:
 3. Wait for timeout (or press RET)
 4. If multiple matches, avy hints appear - press the hint key to jump
 
+** Features
+
+*** Multi-Window Support
+
+By default, fussy-avy searches all windows on the current frame. Configure with =fussy-avy-all-windows=.
+
+*** Visual Match Distinction
+
+- Exact matches (score 0) use =fussy-avy-match-exact= face
+- Fuzzy matches (score > 0) use =fussy-avy-match-fuzzy= face (orange tint)
+
+Customize these faces to your liking.
+
+*** Smart Prompt
+
+The prompt shows:
+- Match count
+- Score of best match (=~1= means 1 edit distance)
+- Preview of best matched text
+
+Example: =Fussy [5~1 'foobar']: footar=
+
+*** Consult Integration
+
+If you use [[https://github.com/minad/consult][consult]], there's =consult-fussy-avy= for a completing-read interface:
+
+#+begin_src elisp
+(global-set-key (kbd "M-g s") #'consult-fussy-avy)
+#+end_src
+
 ** Keys During Input
 
 - Printable chars :: Add to search
@@ -70,9 +106,10 @@ For more forgiving matching:
 make test
 #+end_src
 
-This installs avy to =.deps/= and runs the ERT test suite.
+This installs avy to =.deps/= and runs the ERT test suite (30 tests).
 
 ** Dependencies
 
 - Emacs 27.1+
 - [[https://github.com/abo-abo/avy][avy]]
+- [[https://github.com/minad/consult][consult]] (optional, for =consult-fussy-avy=)
