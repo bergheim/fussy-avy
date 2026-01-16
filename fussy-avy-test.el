@@ -209,6 +209,23 @@
     (should (>= (length (fussy-avy--get-windows)) 1))
     (should (memq (selected-window) (fussy-avy--get-windows)))))
 
+;;; Face Tests
+
+(ert-deftest fussy-avy-test-faces-defined ()
+  "Custom faces are defined."
+  (should (facep 'fussy-avy-match-exact))
+  (should (facep 'fussy-avy-match-fuzzy)))
+
+(ert-deftest fussy-avy-test-match-scores ()
+  "Exact matches have score 0, fuzzy matches have score > 0."
+  (fussy-avy-test--with-buffer "foobar foobaz"
+    (let ((matches (fussy-avy--find-matches "foobar")))
+      ;; Exact match for "foobar" should have score 0
+      (should (= 0 (fussy-avy-test--match-score (car matches)))))
+    (let ((matches (fussy-avy--find-matches "footar")))
+      ;; Fuzzy match should have score > 0
+      (should (> (fussy-avy-test--match-score (car matches)) 0)))))
+
 ;;; Max Forgiving Mode Tests
 
 (ert-deftest fussy-avy-test-max-forgiving-mode ()

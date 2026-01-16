@@ -57,6 +57,18 @@ When `all-frames', search all windows on all frames."
           (const :tag "All windows on all frames" all-frames))
   :group 'fussy-avy)
 
+(defface fussy-avy-match-exact
+  '((t (:inherit avy-goto-char-timer-face)))
+  "Face for exact matches (score 0)."
+  :group 'fussy-avy)
+
+(defface fussy-avy-match-fuzzy
+  '((((background light)) (:background "#ffe0b2" :foreground "black"))
+    (((background dark)) (:background "#5d4037" :foreground "white")))
+  "Face for fuzzy matches (score > 0).
+Uses an orange-ish tint to distinguish from exact matches."
+  :group 'fussy-avy)
+
 ;;;###autoload
 (defun fussy-avy-max-forgiving ()
   "Enable max forgiving settings for fussy-avy."
@@ -220,13 +232,17 @@ Returns list of (position window . score) tuples, sorted by score."
 
 ;;; Overlay Management (Highlighting)
 
-(defun fussy-avy--make-overlay (pos input-len &optional window)
+(defun fussy-avy--make-overlay (pos input-len &optional window score)
   "Create a highlight overlay at POS for INPUT-LEN characters.
-If WINDOW is provided, create overlay in that window's buffer."
+If WINDOW is provided, create overlay in that window's buffer.
+SCORE determines the face: 0 for exact, >0 for fuzzy."
   (let* ((buf (if window (window-buffer window) (current-buffer)))
+         (face (if (and score (> score 0))
+                   'fussy-avy-match-fuzzy
+                 'fussy-avy-match-exact))
          (ov (with-current-buffer buf
                (make-overlay pos (min (+ pos input-len) (point-max))))))
-    (overlay-put ov 'face 'avy-goto-char-timer-face)
+    (overlay-put ov 'face face)
     (overlay-put ov 'priority 100)
     (push ov fussy-avy--overlays)
     ov))
@@ -238,12 +254,15 @@ If WINDOW is provided, create overlay in that window's buffer."
 
 (defun fussy-avy--update-overlays (matches input-len)
   "Update overlays to highlight MATCHES with INPUT-LEN.
-MATCHES is a list of (position window . score) tuples."
+MATCHES is a list of (position window score) tuples.
+Exact matches (score 0) use `fussy-avy-match-exact' face.
+Fuzzy matches (score > 0) use `fussy-avy-match-fuzzy' face."
   (fussy-avy--clear-overlays)
   (dolist (match matches)
     (let ((pos (nth 0 match))
-          (window (nth 1 match)))
-      (fussy-avy--make-overlay pos input-len window))))
+          (window (nth 1 match))
+          (score (nth 2 match)))
+      (fussy-avy--make-overlay pos input-len window score))))
 
 ;;; Input Loop
 
