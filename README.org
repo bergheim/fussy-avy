@@ -1,0 +1,70 @@
+* fussy-avy
+
+Typo-tolerant avy jumping for Emacs. Like =avy-goto-char-timer=, but forgiving of mistakes.
+
+** The Problem
+
+With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", it aborts after the 't' because nothing matches. But it's obvious what you meant.
+
+** The Solution
+
+=fussy-avy= uses Damerau-Levenshtein distance to find matches even when you make typos:
+
+- =footar= matches =foobar= (1 edit)
+- =teh= matches =the= (transposition)
+- =defcstm= matches =defcustom= (2 edits)
+- =with = matches =with-= (space matches any non-word char)
+- =evil i= matches =Evil Integration= (matches across words)
+
+** Installation
+
+#+begin_src elisp
+;; Add to load-path
+(add-to-list 'load-path "/path/to/fussy-avy")
+(require 'fussy-avy)
+
+;; Bind it
+(global-set-key (kbd "C-'") #'fussy-avy-goto-char-timer)
+
+;; Or for Evil users
+(define-key evil-normal-state-map (kbd "s") #'evil-fussy-avy-goto-char-timer)
+#+end_src
+
+** Configuration
+
+#+begin_src elisp
+;; Max edit distance to tolerate (default: 2)
+(setq fussy-avy-max-distance 2)
+
+;; Minimum input length before fuzzy matching kicks in (default: 3)
+;; Below this, exact prefix matching is used
+(setq fussy-avy-min-input-length 3)
+
+;; Timeout between keystrokes (default: avy-timeout-seconds)
+(setq fussy-avy-timeout 0.5)
+#+end_src
+
+For more forgiving matching:
+
+#+begin_src elisp
+(fussy-avy-max-forgiving)  ; Sets distance=4, min-length=2
+#+end_src
+
+** Usage
+
+1. Call =fussy-avy-goto-char-timer=
+2. Type characters - matches highlight live
+3. Wait for timeout (or press RET)
+4. If multiple matches, avy hints appear - press the hint key to jump
+
+** Keys During Input
+
+- Printable chars :: Add to search
+- Backspace :: Delete last char
+- RET :: Finish input early
+- ESC / C-g :: Abort
+
+** Dependencies
+
+- Emacs 27.1+
+- [[https://github.com/abo-abo/avy][avy]]
