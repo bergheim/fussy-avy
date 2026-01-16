@@ -1,0 +1,9 @@
+# Test dependencies
+.deps/
+
+# Byte-compiled files
+*.elc
+
+# Package artifacts
+*-autoloads.el
+*-pkg.el

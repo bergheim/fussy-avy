@@ -64,6 +64,14 @@ For more forgiving matching:
 - RET :: Finish input early
 - ESC / C-g :: Abort
 
+** Running Tests
+
+#+begin_src sh
+make test
+#+end_src
+
+This installs avy to =.deps/= and runs the ERT test suite.
+
 ** Dependencies
 
 - Emacs 27.1+
