@@ -26,8 +26,8 @@ test: deps
 		--eval "(package-initialize)" \
 		-L . \
 		-l ert \
-		-l fuzzy-avy.el \
-		-l fuzzy-avy-test.el \
+		-l fussy-avy.el \
+		-l fussy-avy-test.el \
 		-f ert-run-tests-batch-and-exit
 
 # Clean up

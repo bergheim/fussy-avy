@@ -1,17 +1,17 @@
-;;; fuzzy-avy.el --- Fuzzy/typo-tolerant avy jumping -*- lexical-binding: t; -*-
+;;; fussy-avy.el --- Fussy/typo-tolerant avy jumping -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026
 
 ;; Author: Your Name
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1") (avy "0.5.0"))
-;; Keywords: navigation, fuzzy, matching
-;; URL: https://github.com/your-username/fuzzy-avy
+;; Keywords: navigation, fussy, matching
+;; URL: https://github.com/your-username/fussy-avy
 
 ;;; Commentary:
 
 ;; This package provides a typo-tolerant version of avy-goto-char-timer.
-;; Instead of aborting when you mistype, it uses fuzzy matching to find
+;; Instead of aborting when you mistype, it uses fussy matching to find
 ;; the best matches for what you probably meant.
 ;;
 ;; For example, typing "footar" will still match "foobar" because the
@@ -22,45 +22,45 @@
 (require 'avy)
 (require 'cl-lib)
 
-(defgroup fuzzy-avy nil
-  "Fuzzy/typo-tolerant avy jumping."
+(defgroup fussy-avy nil
+  "Fussy/typo-tolerant avy jumping."
   :group 'convenience
-  :prefix "fuzzy-avy-")
+  :prefix "fussy-avy-")
 
-(defcustom fuzzy-avy-timeout avy-timeout-seconds
+(defcustom fussy-avy-timeout avy-timeout-seconds
   "Timeout in seconds between keystrokes before matching."
   :type 'number
-  :group 'fuzzy-avy)
+  :group 'fussy-avy)
 
-(defcustom fuzzy-avy-max-distance 2
+(defcustom fussy-avy-max-distance 2
   "Maximum edit distance to consider a match.
 Higher values are more forgiving of typos but may produce false positives.
 Set to 3 or 4 for max forgiving mode."
   :type 'integer
-  :group 'fuzzy-avy)
+  :group 'fussy-avy)
 
-(defcustom fuzzy-avy-min-input-length 3
-  "Minimum input length before fuzzy matching kicks in.
+(defcustom fussy-avy-min-input-length 3
+  "Minimum input length before fussy matching kicks in.
 Below this length, exact prefix matching is used.
 Set to 2 for max forgiving mode."
   :type 'integer
-  :group 'fuzzy-avy)
+  :group 'fussy-avy)
 
 ;;;###autoload
-(defun fuzzy-avy-max-forgiving ()
-  "Enable max forgiving settings for fuzzy-avy."
+(defun fussy-avy-max-forgiving ()
+  "Enable max forgiving settings for fussy-avy."
   (interactive)
-  (setq fuzzy-avy-max-distance 4
-        fuzzy-avy-min-input-length 2)
-  (message "Fuzzy-avy max forgiving: distance=%d, min-length=%d"
-           fuzzy-avy-max-distance fuzzy-avy-min-input-length))
+  (setq fussy-avy-max-distance 4
+        fussy-avy-min-input-length 2)
+  (message "Fussy-avy max forgiving: distance=%d, min-length=%d"
+           fussy-avy-max-distance fussy-avy-min-input-length))
 
-(defvar fuzzy-avy--overlays nil
+(defvar fussy-avy--overlays nil
   "List of overlays used for highlighting matches.")
 
 ;;; Damerau-Levenshtein Distance Implementation
 
-(defun fuzzy-avy--damerau-levenshtein (s1 s2)
+(defun fussy-avy--damerau-levenshtein (s1 s2)
   "Calculate Damerau-Levenshtein distance between S1 and S2.
 This allows substitutions, insertions, deletions, and transpositions."
   (let* ((len1 (length s1))
@@ -95,13 +95,13 @@ This allows substitutions, insertions, deletions, and transpositions."
 
 ;;; Input Normalization
 
-(defun fuzzy-avy--normalize-input (input)
+(defun fussy-avy--normalize-input (input)
   "Normalize INPUT for matching.
 Converts spaces to a pattern that matches any non-word character."
   ;; Replace spaces with a marker we'll handle specially
   (replace-regexp-in-string " " "\0" input))
 
-(defun fuzzy-avy--char-match-p (input-char target-char)
+(defun fussy-avy--char-match-p (input-char target-char)
   "Return t if INPUT-CHAR matches TARGET-CHAR.
 Space in input matches any non-word character in target."
   (cond
@@ -114,30 +114,30 @@ Space in input matches any non-word character in target."
    ;; Case-insensitive letter match
    (t (eq (downcase input-char) (downcase target-char)))))
 
-(defun fuzzy-avy--fuzzy-distance (input target)
-  "Calculate fuzzy distance between INPUT and TARGET.
+(defun fussy-avy--fussy-distance (input target)
+  "Calculate fussy distance between INPUT and TARGET.
 Spaces in INPUT match any non-word character.
 Returns the edit distance, or nil if target is too short."
   (if (< (length target) (length input))
       nil
-    (let* ((input-norm (fuzzy-avy--normalize-input (downcase input)))
+    (let* ((input-norm (fussy-avy--normalize-input (downcase input)))
            (target-prefix (downcase (substring target 0 (length input))))
            (len (length input-norm))
            (exact-match t))
       ;; First check for exact/near-exact match with space handling
       (dotimes (i len)
-        (unless (fuzzy-avy--char-match-p (aref input-norm i) (aref target-prefix i))
+        (unless (fussy-avy--char-match-p (aref input-norm i) (aref target-prefix i))
           (setq exact-match nil)))
       (if exact-match
           0
         ;; Fall back to edit distance, treating spaces specially
         ;; For edit distance, replace the null bytes back and compare
         (let ((input-for-dist (replace-regexp-in-string "\0" "-" input-norm)))
-          (fuzzy-avy--damerau-levenshtein input-for-dist target-prefix))))))
+          (fussy-avy--damerau-levenshtein input-for-dist target-prefix))))))
 
 ;;; Buffer Scanning
 
-(defun fuzzy-avy--collect-candidates ()
+(defun fussy-avy--collect-candidates ()
   "Collect all potential jump targets in the visible buffer.
 Returns list of (text . position) for symbols/words."
   (let ((candidates '())
@@ -153,27 +153,27 @@ Returns list of (text . position) for symbols/words."
           (push (cons text pos) candidates))))
     (nreverse candidates)))
 
-(defun fuzzy-avy--get-buffer-text-at (pos len)
+(defun fussy-avy--get-buffer-text-at (pos len)
   "Get LEN characters of buffer text starting at POS."
   (buffer-substring-no-properties pos (min (+ pos len) (point-max))))
 
-(defun fuzzy-avy--find-matches (input)
+(defun fussy-avy--find-matches (input)
   "Find all candidates matching INPUT in the visible buffer.
 Returns list of (position . score) pairs, sorted by score."
   (when (> (length input) 0)
-    (let ((candidates (fuzzy-avy--collect-candidates))
+    (let ((candidates (fussy-avy--collect-candidates))
           (input-len (length input))
           (matches '()))
       (dolist (cand candidates)
         (let* ((pos (cdr cand))
                ;; Compare against buffer text at position, not just the word
-               (buffer-text (fuzzy-avy--get-buffer-text-at pos input-len))
-               (distance (fuzzy-avy--fuzzy-distance input buffer-text)))
+               (buffer-text (fussy-avy--get-buffer-text-at pos input-len))
+               (distance (fussy-avy--fussy-distance input buffer-text)))
           (when (and distance
-                     (or (< input-len fuzzy-avy-min-input-length)
-                         (<= distance fuzzy-avy-max-distance)))
+                     (or (< input-len fussy-avy-min-input-length)
+                         (<= distance fussy-avy-max-distance)))
             ;; For short input, only accept exact prefix (distance 0)
-            (when (or (>= input-len fuzzy-avy-min-input-length)
+            (when (or (>= input-len fussy-avy-min-input-length)
                       (= distance 0))
               (push (cons pos distance) matches)))))
       ;; Sort by score (lower is better), then by position
@@ -184,29 +184,29 @@ Returns list of (position . score) pairs, sorted by score."
 
 ;;; Overlay Management (Highlighting)
 
-(defun fuzzy-avy--make-overlay (pos input-len)
+(defun fussy-avy--make-overlay (pos input-len)
   "Create a highlight overlay at POS for INPUT-LEN characters."
   (let ((ov (make-overlay pos (+ pos input-len))))
     (overlay-put ov 'face 'avy-goto-char-timer-face)
     (overlay-put ov 'priority 100)
-    (push ov fuzzy-avy--overlays)
+    (push ov fussy-avy--overlays)
     ov))
 
-(defun fuzzy-avy--clear-overlays ()
-  "Remove all fuzzy-avy overlays."
-  (mapc #'delete-overlay fuzzy-avy--overlays)
-  (setq fuzzy-avy--overlays nil))
+(defun fussy-avy--clear-overlays ()
+  "Remove all fussy-avy overlays."
+  (mapc #'delete-overlay fussy-avy--overlays)
+  (setq fussy-avy--overlays nil))
 
-(defun fuzzy-avy--update-overlays (matches input-len)
+(defun fussy-avy--update-overlays (matches input-len)
   "Update overlays to highlight MATCHES with INPUT-LEN."
-  (fuzzy-avy--clear-overlays)
+  (fussy-avy--clear-overlays)
   (dolist (match matches)
     (let ((pos (car match)))
-      (fuzzy-avy--make-overlay pos input-len))))
+      (fussy-avy--make-overlay pos input-len))))
 
 ;;; Input Loop
 
-(defun fuzzy-avy--read-input-with-highlights ()
+(defun fussy-avy--read-input-with-highlights ()
   "Read input showing live highlights. Returns (input . matches)."
   (let ((input "")
         (matches nil)
@@ -214,12 +214,12 @@ Returns list of (position . score) pairs, sorted by score."
     (unwind-protect
         (progn
           (while continue
-            (setq matches (fuzzy-avy--find-matches input))
-            (fuzzy-avy--update-overlays matches (length input))
+            (setq matches (fussy-avy--find-matches input))
+            (fussy-avy--update-overlays matches (length input))
             (let* ((match-count (length matches))
-                   (prompt (format "Fuzzy avy [%d]: %s"
+                   (prompt (format "Fussy avy [%d]: %s"
                                    match-count input))
-                   (char (read-char prompt nil fuzzy-avy-timeout)))
+                   (char (read-char prompt nil fussy-avy-timeout)))
               (cond
                ;; Timeout - we're done
                ((null char)
@@ -233,20 +233,20 @@ Returns list of (position . score) pairs, sorted by score."
                 (setq continue nil))
                ;; Escape/C-g - abort
                ((memq char '(?\C-g 27 ?\e))
-                (fuzzy-avy--clear-overlays)
+                (fussy-avy--clear-overlays)
                 (keyboard-quit))
                ;; Regular character (printable)
                ((and (characterp char) (>= char 32) (<= char 126))
                 (setq input (concat input (char-to-string char)))))))
           (cons input matches))
       ;; Cleanup overlays on any exit
-      (fuzzy-avy--clear-overlays))))
+      (fussy-avy--clear-overlays))))
 
 ;;; Main Entry Point
 
 ;;;###autoload
-(defun fuzzy-avy-goto-char-timer ()
-  "Jump to a symbol using fuzzy/typo-tolerant matching.
+(defun fussy-avy-goto-char-timer ()
+  "Jump to a symbol using fussy/typo-tolerant matching.
 Type characters to narrow down matches. Matches are highlighted live.
 After a timeout or pressing RET, avy hints are shown for all matches.
 
@@ -255,7 +255,7 @@ typing `footar' will still match `foobar'.
 
 Spaces in input match any non-word character, so `with ' matches `with-'."
   (interactive)
-  (let* ((result (fuzzy-avy--read-input-with-highlights))
+  (let* ((result (fussy-avy--read-input-with-highlights))
          (input (car result))
          (matches (cdr result)))
     (cond
@@ -275,14 +275,14 @@ Spaces in input match any non-word character, so `with ' matches `with-'."
 ;;; Evil Integration (optional)
 
 (with-eval-after-load 'evil
-  (evil-define-motion evil-fuzzy-avy-goto-char-timer (&optional count)
-    "Evil motion for `fuzzy-avy-goto-char-timer'.
+  (evil-define-motion evil-fussy-avy-goto-char-timer (&optional count)
+    "Evil motion for `fussy-avy-goto-char-timer'.
 COUNT is currently unused but kept for compatibility."
     :type inclusive
     :jump t
     :repeat abort
     (ignore count)
-    (fuzzy-avy-goto-char-timer)))
+    (fussy-avy-goto-char-timer)))
 
-(provide 'fuzzy-avy)
-;;; fuzzy-avy.el ends here
+(provide 'fussy-avy)
+;;; fussy-avy.el ends here
