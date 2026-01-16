@@ -369,5 +369,58 @@ COUNT is currently unused but kept for compatibility."
     (ignore count)
     (fussy-avy-goto-char-timer)))
 
+;;; Consult Integration (optional)
+
+(defvar fussy-avy--consult-history nil
+  "History for `consult-fussy-avy'.")
+
+(defun fussy-avy--consult-candidates ()
+  "Generate candidates for consult from visible buffer symbols.
+Returns list of (display-string . (pos window score)) for each match."
+  (let ((candidates '()))
+    (dolist (win (fussy-avy--get-windows))
+      (with-selected-window win
+        (save-excursion
+          (goto-char (window-start))
+          (let ((pattern "\\_<\\(\\sw\\|\\s_\\)+"))
+            (while (re-search-forward pattern (window-end nil t) t)
+              (let* ((text (match-string-no-properties 0))
+                     (pos (match-beginning 0))
+                     (line (line-number-at-pos pos))
+                     (display (format "%s:%d: %s"
+                                      (buffer-name)
+                                      line
+                                      text)))
+                (push (cons display (list pos win 0)) candidates)))))))
+    (nreverse candidates)))
+
+(defun fussy-avy--consult-lookup (_input cands cand)
+  "Lookup function for consult to get match data from CAND in CANDS."
+  (cdr (assoc cand cands)))
+
+(declare-function consult--read "consult")
+
+;;;###autoload
+(defun consult-fussy-avy ()
+  "Jump to a symbol using consult with fussy-avy candidates.
+This provides a completing-read interface to buffer symbols."
+  (interactive)
+  (unless (require 'consult nil t)
+    (user-error "consult-fussy-avy requires the consult package"))
+  (let* ((candidates (fussy-avy--consult-candidates))
+         (selected (consult--read
+                    candidates
+                    :prompt "Jump to: "
+                    :category 'fussy-avy
+                    :history 'fussy-avy--consult-history
+                    :require-match t
+                    :lookup #'fussy-avy--consult-lookup
+                    :sort nil)))
+    (when selected
+      (let ((pos (nth 0 selected))
+            (window (nth 1 selected)))
+        (select-window window)
+        (goto-char pos)))))
+
 (provide 'fussy-avy)
 ;;; fussy-avy.el ends here

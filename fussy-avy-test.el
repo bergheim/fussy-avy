@@ -264,5 +264,20 @@
     (should (= 4 fussy-avy-max-distance))
     (should (= 2 fussy-avy-min-input-length))))
 
+;;; Consult Integration Tests
+
+(ert-deftest fussy-avy-test-consult-candidates-format ()
+  "Consult candidate format is correct."
+  ;; Test the lookup function works with proper format
+  (let* ((test-cands '(("buf:1: hello" . (1 nil 0))
+                       ("buf:2: world" . (10 nil 0))))
+         (result (fussy-avy--consult-lookup "test" test-cands "buf:1: hello")))
+    (should (equal result '(1 nil 0)))))
+
+(ert-deftest fussy-avy-test-consult-function-exists ()
+  "Consult integration function is defined."
+  (should (fboundp 'consult-fussy-avy))
+  (should (fboundp 'fussy-avy--consult-candidates)))
+
 (provide 'fussy-avy-test)
 ;;; fussy-avy-test.el ends here
