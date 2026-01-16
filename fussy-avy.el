@@ -46,6 +46,17 @@ Set to 2 for max forgiving mode."
   :type 'integer
   :group 'fussy-avy)
 
+(defcustom fussy-avy-all-windows t
+  "Search in all windows on the current frame.
+When nil, only search in the selected window.
+When t, search all windows on the current frame.
+When `all-frames', search all windows on all frames."
+  :type '(choice
+          (const :tag "Only selected window" nil)
+          (const :tag "All windows on frame" t)
+          (const :tag "All windows on all frames" all-frames))
+  :group 'fussy-avy)
+
 ;;;###autoload
 (defun fussy-avy-max-forgiving ()
   "Enable max forgiving settings for fussy-avy."
@@ -137,37 +148,60 @@ Returns the edit distance, or nil if target is too short."
 
 ;;; Buffer Scanning
 
-(defun fussy-avy--collect-candidates ()
-  "Collect all potential jump targets in the visible buffer.
-Returns list of (text . position) for symbols/words."
+(defun fussy-avy--get-windows ()
+  "Get list of windows to search based on `fussy-avy-all-windows'."
+  (cond
+   ((null fussy-avy-all-windows)
+    (list (selected-window)))
+   ((eq fussy-avy-all-windows 'all-frames)
+    (cl-loop for frame in (frame-list)
+             append (window-list frame)))
+   (t
+    (window-list))))
+
+(defun fussy-avy--collect-candidates-in-window (window)
+  "Collect all potential jump targets in WINDOW.
+Returns list of (text position . window) for symbols/words."
   (let ((candidates '())
-        (win-start (window-start))
-        (win-end (window-end nil t))
-        ;; Match symbols (including hyphens) or words
         (pattern "\\_<\\(\\sw\\|\\s_\\)+"))
-    (save-excursion
-      (goto-char win-start)
-      (while (re-search-forward pattern win-end t)
-        (let ((text (match-string-no-properties 0))
-              (pos (match-beginning 0)))
-          (push (cons text pos) candidates))))
+    (with-selected-window window
+      (save-excursion
+        (goto-char (window-start))
+        (while (re-search-forward pattern (window-end nil t) t)
+          (let ((text (match-string-no-properties 0))
+                (pos (match-beginning 0)))
+            (push (list text pos window) candidates)))))
     (nreverse candidates)))
 
-(defun fussy-avy--get-buffer-text-at (pos len)
-  "Get LEN characters of buffer text starting at POS."
-  (buffer-substring-no-properties pos (min (+ pos len) (point-max))))
+(defun fussy-avy--collect-candidates ()
+  "Collect all potential jump targets in visible windows.
+Returns list of (text position . window) for symbols/words."
+  (let ((candidates '()))
+    (dolist (win (fussy-avy--get-windows))
+      (setq candidates (nconc candidates
+                              (fussy-avy--collect-candidates-in-window win))))
+    candidates))
+
+(defun fussy-avy--get-buffer-text-at (pos len &optional window)
+  "Get LEN characters of buffer text starting at POS.
+If WINDOW is provided, get text from that window's buffer."
+  (if window
+      (with-selected-window window
+        (buffer-substring-no-properties pos (min (+ pos len) (point-max))))
+    (buffer-substring-no-properties pos (min (+ pos len) (point-max)))))
 
 (defun fussy-avy--find-matches (input)
-  "Find all candidates matching INPUT in the visible buffer.
-Returns list of (position . score) pairs, sorted by score."
+  "Find all candidates matching INPUT in visible windows.
+Returns list of (position window . score) tuples, sorted by score."
   (when (> (length input) 0)
     (let ((candidates (fussy-avy--collect-candidates))
           (input-len (length input))
           (matches '()))
       (dolist (cand candidates)
-        (let* ((pos (cdr cand))
-               ;; Compare against buffer text at position, not just the word
-               (buffer-text (fussy-avy--get-buffer-text-at pos input-len))
+        (let* ((pos (nth 1 cand))
+               (window (nth 2 cand))
+               ;; Compare against buffer text at position
+               (buffer-text (fussy-avy--get-buffer-text-at pos input-len window))
                (distance (fussy-avy--fussy-distance input buffer-text)))
           (when (and distance
                      (or (< input-len fussy-avy-min-input-length)
@@ -175,18 +209,23 @@ Returns list of (position . score) pairs, sorted by score."
             ;; For short input, only accept exact prefix (distance 0)
             (when (or (>= input-len fussy-avy-min-input-length)
                       (= distance 0))
-              (push (cons pos distance) matches)))))
+              (push (list pos window distance) matches)))))
       ;; Sort by score (lower is better), then by position
       (sort matches (lambda (a b)
-                      (if (= (cdr a) (cdr b))
-                          (< (car a) (car b))
-                        (< (cdr a) (cdr b))))))))
+                      (let ((score-a (nth 2 a))
+                            (score-b (nth 2 b)))
+                        (if (= score-a score-b)
+                            (< (nth 0 a) (nth 0 b))
+                          (< score-a score-b))))))))
 
 ;;; Overlay Management (Highlighting)
 
-(defun fussy-avy--make-overlay (pos input-len)
-  "Create a highlight overlay at POS for INPUT-LEN characters."
-  (let ((ov (make-overlay pos (+ pos input-len))))
+(defun fussy-avy--make-overlay (pos input-len &optional window)
+  "Create a highlight overlay at POS for INPUT-LEN characters.
+If WINDOW is provided, create overlay in that window's buffer."
+  (let* ((buf (if window (window-buffer window) (current-buffer)))
+         (ov (with-current-buffer buf
+               (make-overlay pos (min (+ pos input-len) (point-max))))))
     (overlay-put ov 'face 'avy-goto-char-timer-face)
     (overlay-put ov 'priority 100)
     (push ov fussy-avy--overlays)
@@ -198,11 +237,13 @@ Returns list of (position . score) pairs, sorted by score."
   (setq fussy-avy--overlays nil))
 
 (defun fussy-avy--update-overlays (matches input-len)
-  "Update overlays to highlight MATCHES with INPUT-LEN."
+  "Update overlays to highlight MATCHES with INPUT-LEN.
+MATCHES is a list of (position window . score) tuples."
   (fussy-avy--clear-overlays)
   (dolist (match matches)
-    (let ((pos (car match)))
-      (fussy-avy--make-overlay pos input-len))))
+    (let ((pos (nth 0 match))
+          (window (nth 1 match)))
+      (fussy-avy--make-overlay pos input-len window))))
 
 ;;; Input Loop
 
@@ -253,7 +294,9 @@ After a timeout or pressing RET, avy hints are shown for all matches.
 Unlike `avy-goto-char-timer', this tolerates typos. For example,
 typing `footar' will still match `foobar'.
 
-Spaces in input match any non-word character, so `with ' matches `with-'."
+Spaces in input match any non-word character, so `with ' matches `with-'.
+
+When `fussy-avy-all-windows' is non-nil, searches across multiple windows."
   (interactive)
   (let* ((result (fussy-avy--read-input-with-highlights))
          (input (car result))
@@ -265,11 +308,15 @@ Spaces in input match any non-word character, so `with ' matches `with-'."
       (message "No matches for '%s'" input))
      ((= (length matches) 1)
       ;; Single match - jump directly
-      (goto-char (caar matches)))
+      (let ((pos (nth 0 (car matches)))
+            (window (nth 1 (car matches))))
+        (select-window window)
+        (goto-char pos)))
      (t
       ;; Multiple matches - use avy
       (avy-process
-       (mapcar (lambda (m) (cons (car m) (selected-window)))
+       (mapcar (lambda (m)
+                 (cons (nth 0 m) (nth 1 m)))
                matches))))))
 
 ;;; Evil Integration (optional)

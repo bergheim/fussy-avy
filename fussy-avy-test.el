@@ -99,68 +99,115 @@
   (should (= 0 (fussy-avy--fussy-distance "evil i" "Evil Integration"))))
 
 ;;; Buffer Matching Tests
+;; Match format is now (position window score)
+
+(defun fussy-avy-test--match-pos (match)
+  "Get position from MATCH."
+  (nth 0 match))
+
+(defun fussy-avy-test--match-score (match)
+  "Get score from MATCH."
+  (nth 2 match))
+
+(defmacro fussy-avy-test--with-buffer (content &rest body)
+  "Execute BODY in a temp buffer with CONTENT, mocking window functions."
+  (declare (indent 1))
+  `(let ((test-buf (generate-new-buffer " *fussy-avy-test*")))
+     (unwind-protect
+         (progn
+           (set-buffer test-buf)
+           (insert ,content)
+           (goto-char (point-min))
+           (let ((fussy-avy-all-windows nil)
+                 (test-win (selected-window)))
+             (cl-letf (((symbol-function 'window-start)
+                        (lambda (&optional _) (point-min)))
+                       ((symbol-function 'window-end)
+                        (lambda (&optional _ _) (point-max)))
+                       ((symbol-function 'window-buffer)
+                        (lambda (&optional _) test-buf))
+                       ((symbol-function 'fussy-avy--collect-candidates-in-window)
+                        (lambda (_win)
+                          ;; Collect from test buffer directly
+                          (let ((candidates '())
+                                (pattern "\\_<\\(\\sw\\|\\s_\\)+"))
+                            (with-current-buffer test-buf
+                              (save-excursion
+                                (goto-char (point-min))
+                                (while (re-search-forward pattern (point-max) t)
+                                  (push (list (match-string-no-properties 0)
+                                              (match-beginning 0)
+                                              test-win)
+                                        candidates))))
+                            (nreverse candidates))))
+                       ((symbol-function 'fussy-avy--get-windows)
+                        (lambda () (list test-win)))
+                       ((symbol-function 'fussy-avy--get-buffer-text-at)
+                        (lambda (pos len &optional _win)
+                          (with-current-buffer test-buf
+                            (buffer-substring-no-properties
+                             pos (min (+ pos len) (point-max)))))))
+               ,@body)))
+       (kill-buffer test-buf))))
 
 (ert-deftest fussy-avy-test-find-matches-basic ()
   "Basic matching in buffer."
-  (with-temp-buffer
-    (insert "aaa bbb foobar")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "foo")))
-        (should (= 1 (length matches)))
-        (should (= 9 (caar matches)))))))
+  (fussy-avy-test--with-buffer "aaa bbb foobar"
+    (let ((matches (fussy-avy--find-matches "foo")))
+      (should (= 1 (length matches)))
+      (should (= 9 (fussy-avy-test--match-pos (car matches)))))))
 
 (ert-deftest fussy-avy-test-find-matches-fussy ()
   "Fussy matching finds typo'd input."
-  (with-temp-buffer
-    (insert "hello world foobar")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "footar")))
-        (should (= 1 (length matches)))
-        (should (= 13 (caar matches)))
-        (should (= 1 (cdar matches)))))))
+  (fussy-avy-test--with-buffer "hello world foobar"
+    (let ((matches (fussy-avy--find-matches "footar")))
+      (should (= 1 (length matches)))
+      (should (= 13 (fussy-avy-test--match-pos (car matches))))
+      (should (= 1 (fussy-avy-test--match-score (car matches)))))))
 
 (ert-deftest fussy-avy-test-find-matches-space-hyphen ()
   "Space matches hyphen in symbol names."
-  (with-temp-buffer
+  (fussy-avy-test--with-buffer "with-eval-after-load some-other-thing"
     (emacs-lisp-mode)
-    (insert "with-eval-after-load some-other-thing")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "with ")))
-        (should (>= (length matches) 1))
-        (should (= 1 (caar matches)))))))
+    (let ((matches (fussy-avy--find-matches "with ")))
+      (should (>= (length matches) 1))
+      (should (= 1 (fussy-avy-test--match-pos (car matches)))))))
 
 (ert-deftest fussy-avy-test-find-matches-across-words ()
   "Input with space matches across word boundaries."
-  (with-temp-buffer
-    (insert ";;; Evil Integration (optional)")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "evil i")))
-        (should (= 1 (length matches)))
-        (should (= 0 (cdar matches)))))))
+  (fussy-avy-test--with-buffer ";;; Evil Integration (optional)"
+    (let ((matches (fussy-avy--find-matches "evil i")))
+      (should (= 1 (length matches)))
+      (should (= 0 (fussy-avy-test--match-score (car matches)))))))
 
 (ert-deftest fussy-avy-test-find-matches-no-match ()
   "Returns nil when nothing matches."
-  (with-temp-buffer
-    (insert "hello world")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "zzzzz")))
-        (should (null matches))))))
+  (fussy-avy-test--with-buffer "hello world"
+    (let ((matches (fussy-avy--find-matches "zzzzz")))
+      (should (null matches)))))
 
 (ert-deftest fussy-avy-test-find-matches-sorted-by-score ()
   "Matches are sorted by score (exact first)."
-  (with-temp-buffer
-    (insert "foobar foobaz")
-    (cl-letf (((symbol-function 'window-start) (lambda (&optional _) (point-min)))
-              ((symbol-function 'window-end) (lambda (&optional _ _) (point-max))))
-      (let ((matches (fussy-avy--find-matches "foobar")))
-        (should (>= (length matches) 1))
-        ;; First match should be exact (score 0)
-        (should (= 0 (cdar matches)))))))
+  (fussy-avy-test--with-buffer "foobar foobaz"
+    (let ((matches (fussy-avy--find-matches "foobar")))
+      (should (>= (length matches) 1))
+      ;; First match should be exact (score 0)
+      (should (= 0 (fussy-avy-test--match-score (car matches)))))))
+
+;;; Multi-Window Tests
+
+(ert-deftest fussy-avy-test-all-windows-nil ()
+  "When fussy-avy-all-windows is nil, only selected window."
+  (let ((fussy-avy-all-windows nil))
+    (should (= 1 (length (fussy-avy--get-windows))))
+    (should (eq (selected-window) (car (fussy-avy--get-windows))))))
+
+(ert-deftest fussy-avy-test-all-windows-t ()
+  "When fussy-avy-all-windows is t, get all frame windows."
+  (let ((fussy-avy-all-windows t))
+    ;; Should return at least the selected window
+    (should (>= (length (fussy-avy--get-windows)) 1))
+    (should (memq (selected-window) (fussy-avy--get-windows)))))
 
 ;;; Max Forgiving Mode Tests
 
