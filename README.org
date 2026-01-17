@@ -29,7 +29,6 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
   :config
   ;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
   ;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
-  ;; (setq fussy-avy-timeout 0.5)         ; Timeout between keystrokes
   ;; (setq fussy-avy-all-windows t)       ; Search all windows on frame
   ;; (fussy-avy-max-forgiving)            ; Sets distance=4, min-length=2
   )
@@ -47,7 +46,6 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 
 ;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
 ;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
-;; (setq fussy-avy-timeout 0.5)         ; Timeout between keystrokes
 ;; (setq fussy-avy-all-windows t)       ; Search all windows on frame
 ;; (fussy-avy-max-forgiving)            ; Sets distance=4, min-length=2
 #+end_src

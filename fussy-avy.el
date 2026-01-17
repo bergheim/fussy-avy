@@ -27,11 +27,6 @@
   :group 'convenience
   :prefix "fussy-avy-")
 
-(defcustom fussy-avy-timeout avy-timeout-seconds
-  "Timeout in seconds between keystrokes before matching."
-  :type 'number
-  :group 'fussy-avy)
-
 (defcustom fussy-avy-max-distance 2
   "Maximum edit distance to consider a match.
 Higher values are more forgiving of typos but may produce false positives.
@@ -298,7 +293,7 @@ Fuzzy matches (score > 0) use `fussy-avy-match-fuzzy' face."
             (setq matches (fussy-avy--find-matches input))
             (fussy-avy--update-overlays matches (length input))
             (let* ((prompt (fussy-avy--format-prompt input matches))
-                   (char (read-char prompt nil fussy-avy-timeout)))
+                   (char (read-char prompt nil avy-timeout-seconds)))
               (cond
                ;; Timeout - we're done
                ((null char)
