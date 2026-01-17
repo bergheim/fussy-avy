@@ -25,7 +25,13 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
   :ensure (:host github :repo "bergheim/fussy-avy")
   :bind (("C-'" . fussy-avy-goto-char-timer))
   ;; Or for Evil users
-  ;; :bind (:map evil-normal-state-map ("s" . evil-fussy-avy-goto-char-timer))
+  ;; :bind (:map evil-normal-state-map ("g " . evil-fussy-avy-goto-char-timer))
+  :config
+  ;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
+  ;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
+  ;; (setq fussy-avy-timeout 0.5)         ; Timeout between keystrokes
+  ;; (setq fussy-avy-all-windows t)       ; Search all windows on frame
+  ;; (fussy-avy-max-forgiving)            ; Sets distance=4, min-length=2
   )
 #+end_src
 
@@ -37,33 +43,13 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 (global-set-key (kbd "C-'") #'fussy-avy-goto-char-timer)
 
 ;; Or for Evil users
-(define-key evil-normal-state-map (kbd "s") #'evil-fussy-avy-goto-char-timer)
-#+end_src
+(define-key evil-normal-state-map (kbd "g ") #'evil-fussy-avy-goto-char-timer)
 
-** Configuration
-
-#+begin_src elisp
-;; Max edit distance to tolerate (default: 2)
-(setq fussy-avy-max-distance 2)
-
-;; Minimum input length before fussy matching kicks in (default: 3)
-;; Below this, exact prefix matching is used
-(setq fussy-avy-min-input-length 3)
-
-;; Timeout between keystrokes (default: avy-timeout-seconds)
-(setq fussy-avy-timeout 0.5)
-
-;; Search in all windows (default: t)
-;; nil = only current window
-;; t = all windows on current frame
-;; 'all-frames = all windows on all frames
-(setq fussy-avy-all-windows t)
-#+end_src
-
-For more forgiving matching:
-
-#+begin_src elisp
-(fussy-avy-max-forgiving)  ; Sets distance=4, min-length=2
+;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
+;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
+;; (setq fussy-avy-timeout 0.5)         ; Timeout between keystrokes
+;; (setq fussy-avy-all-windows t)       ; Search all windows on frame
+;; (fussy-avy-max-forgiving)            ; Sets distance=4, min-length=2
 #+end_src
 
 ** Usage
