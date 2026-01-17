@@ -18,12 +18,37 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 
 ** Installation
 
+*** use-package (with elpaca)
+
 #+begin_src elisp
-;; Add to load-path
+(use-package fussy-avy
+  :elpaca (:host github :repo "bergheim/fussy-avy")
+  :bind (("C-'" . fussy-avy-goto-char-timer))
+  ;; Or for Evil users
+  ;; :bind (:map evil-normal-state-map ("s" . evil-fussy-avy-goto-char-timer))
+  )
+#+end_src
+
+*** use-package (with straight.el)
+
+#+begin_src elisp
+(use-package fussy-avy
+  :straight (:host github :repo "bergheim/fussy-avy")
+  :bind (("C-'" . fussy-avy-goto-char-timer)))
+#+end_src
+
+*** elpaca (without use-package)
+
+#+begin_src elisp
+(elpaca (fussy-avy :host github :repo "bergheim/fussy-avy"))
+(global-set-key (kbd "C-'") #'fussy-avy-goto-char-timer)
+#+end_src
+
+*** Manual
+
+#+begin_src elisp
 (add-to-list 'load-path "/path/to/fussy-avy")
 (require 'fussy-avy)
-
-;; Bind it
 (global-set-key (kbd "C-'") #'fussy-avy-goto-char-timer)
 
 ;; Or for Evil users
