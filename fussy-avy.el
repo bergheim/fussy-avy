@@ -354,15 +354,20 @@ When `fussy-avy-all-windows' is non-nil, searches across multiple windows."
 
 ;;; Evil Integration (optional)
 
+;; Use `eval' to prevent byte-compiler from analyzing the evil-define-motion
+;; form before evil is loaded. Without this, byte-compilation produces
+;; "reference to free variable" warnings that become runtime errors.
 (with-eval-after-load 'evil
-  (evil-define-motion evil-fussy-avy-goto-char-timer (&optional count)
-    "Evil motion for `fussy-avy-goto-char-timer'.
+  (eval
+   '(evil-define-motion evil-fussy-avy-goto-char-timer (&optional count)
+      "Evil motion for `fussy-avy-goto-char-timer'.
 COUNT is currently unused but kept for compatibility."
-    :type inclusive
-    :jump t
-    :repeat abort
-    (ignore count)
-    (fussy-avy-goto-char-timer)))
+      :type inclusive
+      :jump t
+      :repeat abort
+      (ignore count)
+      (fussy-avy-goto-char-timer))
+   t))
 
 ;;; Consult Integration (optional)
 

@@ -24,9 +24,10 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 (use-package fussy-avy
   :ensure (:host github :repo "bergheim/fussy-avy")
   :bind (("C-'" . fussy-avy-goto-char-timer))
-  ;; Or for Evil users
-  ;; :bind (:map evil-normal-state-map ("g " . evil-fussy-avy-goto-char-timer))
   :config
+  ;; For Evil users: must be in :config to ensure fussy-avy is loaded first
+  ;; (with-eval-after-load 'evil
+  ;;   (define-key evil-normal-state-map (kbd "g ") #'evil-fussy-avy-goto-char-timer))
   ;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
   ;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
   ;; (setq fussy-avy-all-windows t)       ; Search all windows on frame
@@ -41,8 +42,9 @@ With =avy-goto-char-timer=, if you want to jump to "foobar" but type "footar", i
 (require 'fussy-avy)
 (global-set-key (kbd "C-'") #'fussy-avy-goto-char-timer)
 
-;; Or for Evil users
-(define-key evil-normal-state-map (kbd "g ") #'evil-fussy-avy-goto-char-timer)
+;; For Evil users: wrap in with-eval-after-load to handle load order
+;; (with-eval-after-load 'evil
+;;   (define-key evil-normal-state-map (kbd "g ") #'evil-fussy-avy-goto-char-timer))
 
 ;; (setq fussy-avy-max-distance 2)      ; Max edit distance to tolerate
 ;; (setq fussy-avy-min-input-length 3)  ; Min chars before fuzzy matching
@@ -100,7 +102,7 @@ If you use [[https://github.com/minad/consult][consult]], there's =consult-fussy
 make test
 #+end_src
 
-This installs avy to =.deps/= and runs the ERT test suite (30 tests).
+This installs avy to =.deps/= and runs the ERT test suite (32 tests).
 
 ** Dependencies
 

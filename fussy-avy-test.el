@@ -279,5 +279,28 @@
   (should (fboundp 'consult-fussy-avy))
   (should (fboundp 'fussy-avy--consult-candidates)))
 
+;;; Evil Integration Tests
+
+(ert-deftest fussy-avy-test-evil-function-not-defined-without-evil ()
+  "Evil motion is not defined until evil is loaded.
+This tests that evil-fussy-avy-goto-char-timer is defined via
+with-eval-after-load, not unconditionally."
+  ;; If evil is not loaded, the function should not exist
+  ;; If evil IS loaded (e.g., in test environment), the function should exist
+  ;; Either way, the symbol should not cause an error when quoted
+  (should (symbolp 'evil-fussy-avy-goto-char-timer))
+  ;; The function should only be bound if evil is loaded
+  (if (featurep 'evil)
+      (should (fboundp 'evil-fussy-avy-goto-char-timer))
+    (should-not (fboundp 'evil-fussy-avy-goto-char-timer))))
+
+(ert-deftest fussy-avy-test-evil-function-defined-after-evil ()
+  "Evil motion is defined after evil is loaded."
+  (skip-unless (locate-library "evil"))
+  (require 'evil)
+  (should (fboundp 'evil-fussy-avy-goto-char-timer))
+  ;; Verify it's actually a function that calls fussy-avy-goto-char-timer
+  (should (commandp 'evil-fussy-avy-goto-char-timer)))
+
 (provide 'fussy-avy-test)
 ;;; fussy-avy-test.el ends here
