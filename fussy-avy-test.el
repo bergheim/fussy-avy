@@ -268,14 +268,14 @@
 
 (ert-deftest fussy-avy-test-consult-lookup ()
   "Consult lookup function works with correct signature."
-  (let ((test-cands '(("buf:1: hello" . (1 nil 0))
-                      ("buf:2: world" . (10 nil 0)))))
+  (let ((test-cands '(("buf:1: hello" . (1 nil 5))
+                      ("buf:2: world" . (10 nil 5)))))
     ;; Basic lookup
     (should (equal (fussy-avy--consult-lookup "buf:1: hello" test-cands)
-                   '(1 nil 0)))
+                   '(1 nil 5)))
     ;; With extra args (like consult passes)
     (should (equal (fussy-avy--consult-lookup "buf:2: world" test-cands 'extra 'args)
-                   '(10 nil 0)))
+                   '(10 nil 5)))
     ;; Not found
     (should (null (fussy-avy--consult-lookup "nonexistent" test-cands)))))
 

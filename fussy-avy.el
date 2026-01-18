@@ -376,7 +376,7 @@ COUNT is currently unused but kept for compatibility."
 
 (defun fussy-avy--consult-candidates ()
   "Generate candidates for consult from visible buffer symbols.
-Returns list of (display-string . (pos window score)) for each match."
+Returns list of (display-string . (pos window len)) for each match."
   (let ((candidates '()))
     (dolist (win (fussy-avy--get-windows))
       (with-selected-window win
@@ -386,12 +386,13 @@ Returns list of (display-string . (pos window score)) for each match."
             (while (re-search-forward pattern (window-end nil t) t)
               (let* ((text (match-string-no-properties 0))
                      (pos (match-beginning 0))
+                     (len (length text))
                      (line (line-number-at-pos pos))
                      (display (format "%s:%d: %s"
                                       (buffer-name)
                                       line
                                       text)))
-                (push (cons display (list pos win 0)) candidates)))))))
+                (push (cons display (list pos win len)) candidates)))))))
     (nreverse candidates)))
 
 (defun fussy-avy--consult-lookup (selected candidates &rest _)
@@ -402,22 +403,28 @@ Returns list of (display-string . (pos window score)) for each match."
 
 (defun fussy-avy--consult-state ()
   "State function for `consult-fussy-avy' to preview candidates."
-  (let (saved-pos saved-window)
+  (let (saved-pos saved-window overlay)
     (lambda (action cand)
       (pcase action
         ('setup
          (setq saved-pos (point-marker)
                saved-window (selected-window)))
         ('preview
+         (when overlay (delete-overlay overlay))
+         (setq overlay nil)
          (when cand
            (let ((pos (nth 0 cand))
-                 (window (nth 1 cand)))
+                 (window (nth 1 cand))
+                 (len (nth 2 cand)))
              (when (and window (window-live-p window))
                (select-window window)
-               (goto-char pos)))))
+               (goto-char pos)
+               (setq overlay (make-overlay pos (+ pos len)))
+               (overlay-put overlay 'face 'highlight)))))
         ('return
          cand)
         ('exit
+         (when overlay (delete-overlay overlay))
          (when (and saved-window (window-live-p saved-window))
            (select-window saved-window))
          (when (marker-buffer saved-pos)
