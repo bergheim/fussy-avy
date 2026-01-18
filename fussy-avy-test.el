@@ -264,26 +264,6 @@
     (should (= 4 fussy-avy-max-distance))
     (should (= 2 fussy-avy-min-input-length))))
 
-;;; Consult Integration Tests
-
-(ert-deftest fussy-avy-test-consult-lookup ()
-  "Consult lookup function works with correct signature."
-  (let ((test-cands '(("buf:1: hello" . (1 nil 5))
-                      ("buf:2: world" . (10 nil 5)))))
-    ;; Basic lookup
-    (should (equal (fussy-avy--consult-lookup "buf:1: hello" test-cands)
-                   '(1 nil 5)))
-    ;; With extra args (like consult passes)
-    (should (equal (fussy-avy--consult-lookup "buf:2: world" test-cands 'extra 'args)
-                   '(10 nil 5)))
-    ;; Not found
-    (should (null (fussy-avy--consult-lookup "nonexistent" test-cands)))))
-
-(ert-deftest fussy-avy-test-consult-function-exists ()
-  "Consult integration function is defined."
-  (should (fboundp 'consult-fussy-avy))
-  (should (fboundp 'fussy-avy--consult-candidates)))
-
 ;;; Evil Integration Tests
 
 (ert-deftest fussy-avy-test-evil-function-not-defined-without-evil ()
