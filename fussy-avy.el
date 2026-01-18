@@ -468,6 +468,97 @@ Returns list of (position window score) for the first token in each matching sen
                                 (< (nth 0 a) (nth 0 b))
                               (< score-a score-b))))))))))
 
+(defun fussy-avy-orderless--format-prompt (input matches)
+  "Format the prompt for orderless matching showing INPUT and MATCHES."
+  (let* ((match-count (length matches))
+         (tokens (fussy-avy-orderless--split-tokens input))
+         (token-count (length tokens)))
+    (if (and matches (> (length input) 0))
+        (let* ((best-match (car matches))
+               (pos (nth 0 best-match))
+               (window (nth 1 best-match))
+               (score (nth 2 best-match))
+               (preview-len (min 25 (+ (length input) 10)))
+               (matched-text (fussy-avy--get-buffer-text-at pos preview-len window))
+               (display-text (if (> (length matched-text) 20)
+                                 (concat (substring matched-text 0 17) "...")
+                               matched-text))
+               (score-indicator (if (= score 0) "" (format "~%d" score))))
+          (format "Orderless [%d%s '%s'] (%d tokens): %s"
+                  match-count score-indicator display-text token-count input))
+      (format "Orderless [%d] (%d tokens): %s" match-count token-count input))))
+
+(defun fussy-avy-orderless--read-input-with-highlights ()
+  "Read input for orderless matching with live highlights.
+Returns (input . matches)."
+  (let ((input "")
+        (matches nil)
+        (continue t))
+    (unwind-protect
+        (progn
+          (while continue
+            (setq matches (fussy-avy-orderless--find-matches input))
+            (fussy-avy--update-overlays matches (length input))
+            (let* ((prompt (fussy-avy-orderless--format-prompt input matches))
+                   (char (read-char prompt nil avy-timeout-seconds)))
+              (cond
+               ;; Timeout - we're done
+               ((null char)
+                (setq continue nil))
+               ;; Backspace
+               ((memq char '(?\C-h ?\C-? 127))
+                (when (> (length input) 0)
+                  (setq input (substring input 0 -1))))
+               ;; Enter/Return - we're done
+               ((memq char '(?\C-m ?\C-j))
+                (setq continue nil))
+               ;; Escape/C-g - abort
+               ((memq char '(?\C-g 27 ?\e))
+                (fussy-avy--clear-overlays)
+                (keyboard-quit))
+               ;; Regular character (printable)
+               ((and (characterp char) (>= char 32) (<= char 126))
+                (setq input (concat input (char-to-string char)))))))
+          (cons input matches))
+      ;; Cleanup overlays on any exit
+      (fussy-avy--clear-overlays))))
+
+;;;###autoload
+(defun fussy-avy-goto-char-timer-orderless ()
+  "Jump using orderless sentence matching.
+Type space-separated words to match within sentences. All words must
+exist in the same sentence. Jumps to the first word's position.
+
+For example, in \"a fox trout on a meme\", typing \"fox meme\" will
+jump to \"fox\" because both words exist in that sentence.
+
+Single words degrade to regular fussy matching. Supports fuzzy/typo-tolerant
+matching on each word.
+
+When `fussy-avy-all-windows' is non-nil, searches across multiple windows."
+  (interactive)
+  (let* ((result (fussy-avy-orderless--read-input-with-highlights))
+         (input (car result))
+         (matches (cdr result)))
+    (cond
+     ((string-empty-p input)
+      (message "No input"))
+     ((null matches)
+      (message "No matches for '%s'" input))
+     ((= (length matches) 1)
+      ;; Single match - jump directly
+      (let ((pos (nth 0 (car matches)))
+            (window (nth 1 (car matches))))
+        (select-window window)
+        (goto-char pos)))
+     (t
+      ;; Multiple matches - use avy
+      (avy-with fussy-avy-goto-char-timer-orderless
+        (avy-process
+         (mapcar (lambda (m)
+                   (cons (nth 0 m) (nth 1 m)))
+                 matches)))))))
+
 ;;; Evil Integration (optional)
 
 ;; Use `eval' to prevent byte-compiler from analyzing the evil-define-motion
@@ -483,6 +574,16 @@ COUNT is currently unused but kept for compatibility."
       :repeat abort
       (ignore count)
       (fussy-avy-goto-char-timer))
+   t)
+  (eval
+   '(evil-define-motion evil-fussy-avy-goto-char-timer-orderless (&optional count)
+      "Evil motion for `fussy-avy-goto-char-timer-orderless'.
+COUNT is currently unused but kept for compatibility."
+      :type inclusive
+      :jump t
+      :repeat abort
+      (ignore count)
+      (fussy-avy-goto-char-timer-orderless))
    t))
 
 (provide 'fussy-avy)

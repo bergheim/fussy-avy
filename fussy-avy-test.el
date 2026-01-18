@@ -445,5 +445,29 @@ with-eval-after-load, not unconditionally."
       ;; Should jump to "trout" (first token) at position 7
       (should (= 7 (fussy-avy-test--match-pos (car matches)))))))
 
+;;; Orderless Command Tests
+
+(ert-deftest fussy-avy-test-orderless-command-exists ()
+  "The orderless command should exist and be interactive."
+  :tags '(orderless)
+  (should (fboundp 'fussy-avy-goto-char-timer-orderless))
+  (should (commandp 'fussy-avy-goto-char-timer-orderless)))
+
+(ert-deftest fussy-avy-test-orderless-evil-not-defined-without-evil ()
+  "Evil orderless motion is not defined until evil is loaded."
+  :tags '(orderless)
+  (should (symbolp 'evil-fussy-avy-goto-char-timer-orderless))
+  (if (featurep 'evil)
+      (should (fboundp 'evil-fussy-avy-goto-char-timer-orderless))
+    (should-not (fboundp 'evil-fussy-avy-goto-char-timer-orderless))))
+
+(ert-deftest fussy-avy-test-orderless-evil-defined-after-evil ()
+  "Evil orderless motion is defined after evil is loaded."
+  :tags '(orderless)
+  (skip-unless (locate-library "evil"))
+  (require 'evil)
+  (should (fboundp 'evil-fussy-avy-goto-char-timer-orderless))
+  (should (commandp 'evil-fussy-avy-goto-char-timer-orderless)))
+
 (provide 'fussy-avy-test)
 ;;; fussy-avy-test.el ends here
