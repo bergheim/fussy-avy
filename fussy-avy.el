@@ -134,24 +134,22 @@ Space in input matches any non-word character in target."
 
 (defun fussy-avy--fussy-distance (input target)
   "Calculate fussy distance between INPUT and TARGET.
-Spaces in INPUT match any non-word character.
+Spaces in INPUT are ignored - they match anything.
 Returns the edit distance, or nil if target is too short."
-  (if (< (length target) (length input))
-      nil
-    (let* ((input-norm (fussy-avy--normalize-input (downcase input)))
-           (target-prefix (downcase (substring target 0 (length input))))
-           (len (length input-norm))
-           (exact-match t))
-      ;; First check for exact/near-exact match with space handling
-      (dotimes (i len)
-        (unless (fussy-avy--char-match-p (aref input-norm i) (aref target-prefix i))
-          (setq exact-match nil)))
-      (if exact-match
-          0
-        ;; Fall back to edit distance, treating spaces specially
-        ;; For edit distance, replace the null bytes back and compare
-        (let ((input-for-dist (replace-regexp-in-string "\0" "-" input-norm)))
-          (fussy-avy--damerau-levenshtein input-for-dist target-prefix))))))
+  (let* ((input-stripped (replace-regexp-in-string " " "" (downcase input)))
+         (stripped-len (length input-stripped))
+         ;; Take enough chars from target to account for possible separators
+         (target-prefix-len (min (length target) (+ (length input) 4)))
+         (target-prefix (downcase (substring target 0 target-prefix-len)))
+         ;; Strip all non-alphanumeric from target so space matches any separator
+         (target-stripped (replace-regexp-in-string "[^a-z0-9]" "" target-prefix)))
+    (if (< (length target-stripped) stripped-len)
+        nil
+      ;; Compare input against same-length prefix of stripped target
+      (let ((target-cmp (substring target-stripped 0 stripped-len)))
+        (if (string= input-stripped target-cmp)
+            0
+          (fussy-avy--damerau-levenshtein input-stripped target-cmp))))))
 
 ;;; Buffer Scanning
 
