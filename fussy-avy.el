@@ -197,20 +197,40 @@ Returns list of (position window score) tuples."
             (forward-char 1)))))
     matches))
 
+(defun fussy-avy--dedupe-matches (matches input-len)
+  "Remove nearby duplicate MATCHES, keeping best score in each cluster.
+Matches within INPUT-LEN positions of a better match are removed."
+  (let ((kept '()))
+    (dolist (match matches)
+      (let ((pos (nth 0 match))
+            (win (nth 1 match))
+            (dominated nil))
+        ;; Check if any kept match is within input-len positions in same window
+        (dolist (k kept)
+          (when (and (eq win (nth 1 k))
+                     (< (abs (- pos (nth 0 k))) input-len))
+            (setq dominated t)))
+        (unless dominated
+          (push match kept))))
+    (nreverse kept)))
+
 (defun fussy-avy--find-matches (input)
   "Find all candidates matching INPUT in visible windows.
 Returns list of (position window score) tuples, sorted by score."
   (when (> (length input) 0)
-    (let ((matches '()))
+    (let ((matches '())
+          (input-len (length input)))
       (dolist (win (fussy-avy--get-windows))
         (setq matches (nconc matches (fussy-avy--find-matches-in-window win input))))
       ;; Sort by score (lower is better), then by position
-      (sort matches (lambda (a b)
-                      (let ((score-a (nth 2 a))
-                            (score-b (nth 2 b)))
-                        (if (= score-a score-b)
-                            (< (nth 0 a) (nth 0 b))
-                          (< score-a score-b))))))))
+      (setq matches (sort matches (lambda (a b)
+                                    (let ((score-a (nth 2 a))
+                                          (score-b (nth 2 b)))
+                                      (if (= score-a score-b)
+                                          (< (nth 0 a) (nth 0 b))
+                                        (< score-a score-b))))))
+      ;; Remove nearby duplicates, keeping best
+      (fussy-avy--dedupe-matches matches input-len))))
 
 ;;; Overlay Management (Highlighting)
 
