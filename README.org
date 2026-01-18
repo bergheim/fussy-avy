@@ -11,21 +11,13 @@ Type "footar" and it still finds "foobar". Space matches any non-word char, so "
   :ensure (:host github :repo "bergheim/fussy-avy")
   :bind (("C-'" . fussy-avy-goto-char-timer)
          :map evil-normal-state-map
-         ("g " . evil-fussy-avy-goto-char-timer)))
-#+end_src
-
-** Configuration
-
-#+begin_src elisp
-(setq fussy-avy-max-distance 2)      ; max edit distance (default 2)
-(setq fussy-avy-min-input-length 3)  ; chars before fuzzy kicks in (default 3)
-(setq fussy-avy-all-windows t)       ; search all windows (default t)
-#+end_src
-
-Or just crank it up:
-
-#+begin_src elisp
-(fussy-avy-max-forgiving)  ; distance=4, min-length=2
+         ("g " . evil-fussy-avy-goto-char-timer))
+  :config
+  ;; (setq fussy-avy-max-distance 2)      ; max edit distance (default 2)
+  ;; (setq fussy-avy-min-input-length 3)  ; chars before fuzzy kicks in (default 3)
+  ;; (setq fussy-avy-all-windows t)       ; search all windows (default t)
+  ;; (fussy-avy-max-forgiving)            ; crank it up: distance=4, min-length=2
+  )
 #+end_src
 
 ** Faces
@@ -35,9 +27,7 @@ Or just crank it up:
 
 ** Consult
 
-#+begin_src elisp
-(global-set-key (kbd "M-g s") #'consult-fussy-avy)
-#+end_src
+=consult-fussy-avy= provides a completing-read interface to visible symbols.
 
 ** Dependencies
 
