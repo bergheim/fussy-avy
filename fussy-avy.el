@@ -394,9 +394,9 @@ Returns list of (display-string . (pos window score)) for each match."
                 (push (cons display (list pos win 0)) candidates)))))))
     (nreverse candidates)))
 
-(defun fussy-avy--consult-lookup (_input cands cand)
-  "Lookup function for consult to get match data from CAND in CANDS."
-  (cdr (assoc cand cands)))
+(defun fussy-avy--consult-lookup (selected candidates &rest _)
+  "Lookup SELECTED in CANDIDATES alist, return cdr."
+  (cdr (assoc selected candidates)))
 
 (declare-function consult--read "consult")
 

@@ -266,13 +266,18 @@
 
 ;;; Consult Integration Tests
 
-(ert-deftest fussy-avy-test-consult-candidates-format ()
-  "Consult candidate format is correct."
-  ;; Test the lookup function works with proper format
-  (let* ((test-cands '(("buf:1: hello" . (1 nil 0))
-                       ("buf:2: world" . (10 nil 0))))
-         (result (fussy-avy--consult-lookup "test" test-cands "buf:1: hello")))
-    (should (equal result '(1 nil 0)))))
+(ert-deftest fussy-avy-test-consult-lookup ()
+  "Consult lookup function works with correct signature."
+  (let ((test-cands '(("buf:1: hello" . (1 nil 0))
+                      ("buf:2: world" . (10 nil 0)))))
+    ;; Basic lookup
+    (should (equal (fussy-avy--consult-lookup "buf:1: hello" test-cands)
+                   '(1 nil 0)))
+    ;; With extra args (like consult passes)
+    (should (equal (fussy-avy--consult-lookup "buf:2: world" test-cands 'extra 'args)
+                   '(10 nil 0)))
+    ;; Not found
+    (should (null (fussy-avy--consult-lookup "nonexistent" test-cands)))))
 
 (ert-deftest fussy-avy-test-consult-function-exists ()
   "Consult integration function is defined."
