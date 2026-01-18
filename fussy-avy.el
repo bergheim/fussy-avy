@@ -334,10 +334,11 @@ When `fussy-avy-all-windows' is non-nil, searches across multiple windows."
         (goto-char pos)))
      (t
       ;; Multiple matches - use avy
-      (avy-process
-       (mapcar (lambda (m)
-                 (cons (nth 0 m) (nth 1 m)))
-               matches))))))
+      (avy-with fussy-avy-goto-char-timer
+        (avy-process
+         (mapcar (lambda (m)
+                   (cons (nth 0 m) (nth 1 m)))
+                 matches)))))))
 
 ;;; Evil Integration (optional)
 
