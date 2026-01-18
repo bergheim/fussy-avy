@@ -4,6 +4,8 @@ Typo-tolerant avy jumping. Like =avy-goto-char-timer=, but it doesn't abort when
 
 Type "footar" and it still finds "foobar". Space matches any non-word char, so "with " matches "with-".
 
+There's also =consult-fussy-avy= if you prefer a completing-read interface.
+
 ** Installation
 
 #+begin_src elisp
@@ -23,10 +25,6 @@ Type "footar" and it still finds "foobar". Space matches any non-word char, so "
   ;; (fussy-avy-max-forgiving)       ; crank it up: distance=4, min-length=2
   )
 #+end_src
-
-** Consult
-
-=consult-fussy-avy= provides a completing-read interface to visible symbols.
 
 ** Dependencies
 
