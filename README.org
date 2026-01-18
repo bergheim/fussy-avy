@@ -4,14 +4,38 @@ Typo-tolerant avy jumping. Like =avy-goto-char-timer=, but it doesn't abort when
 
 Type "footar" and it still finds "foobar". Space matches any non-word char, so "with " matches "with-".
 
+** Commands
+
+- =fussy-avy-goto-char-timer= - Typo-tolerant character jumping
+- =fussy-avy-goto-char-timer-orderless= - Multi-word sentence jumping (see below)
+
+** Orderless Mode
+
+Use =fussy-avy-goto-char-timer-orderless= for jumping with multiple words.
+
+Type space-separated words and jump to any sentence containing all of them:
+
+#+begin_example
+Buffer: "a fox trout on a meme"
+Input:  "fox meme"
+Result: jumps to "fox"
+#+end_example
+
+- All words must exist in the same sentence
+- Word order in input doesn't matter
+- First word = jump target
+- Each word supports fuzzy/typo-tolerant matching
+
 ** Installation
 
 #+begin_src elisp
 (use-package fussy-avy
   :ensure (:host github :repo "bergheim/fussy-avy")
   :bind (("C-'" . fussy-avy-goto-char-timer)
+         ("C-\"" . fussy-avy-goto-char-timer-orderless)
          :map evil-normal-state-map
-         ("g " . evil-fussy-avy-goto-char-timer))
+         ("g " . evil-fussy-avy-goto-char-timer)
+         ("g\"" . evil-fussy-avy-goto-char-timer-orderless))
   :custom
   ;; (fussy-avy-max-distance 2)      ; max edit distance (default 2)
   ;; (fussy-avy-min-input-length 3)  ; chars before fuzzy kicks in (default 3)
