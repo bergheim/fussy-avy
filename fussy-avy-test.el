@@ -147,6 +147,36 @@
                                                    (= distance 0)))
                                       (push (list (point) test-win distance) matches)))
                                   (forward-char 1))))
+                            matches)))
+                       ((symbol-function 'fussy-avy-orderless--find-matches-in-window)
+                        (lambda (_win input)
+                          ;; Orderless matching in test buffer
+                          (let* ((tokens (fussy-avy-orderless--split-tokens input))
+                                 (first-token (car tokens))
+                                 (matches '()))
+                            (with-current-buffer test-buf
+                              (let* ((text (buffer-substring-no-properties (point-min) (point-max)))
+                                     (sentences (fussy-avy-orderless--get-sentences-from-text text 1)))
+                                (dolist (sentence-bounds sentences)
+                                  (let* ((sent-start (car sentence-bounds))
+                                         (sent-end (cdr sentence-bounds))
+                                         (sentence-text (buffer-substring-no-properties sent-start sent-end))
+                                         (all-match t)
+                                         (first-token-match nil))
+                                    ;; Check if all tokens match in this sentence
+                                    (dolist (token tokens)
+                                      (let ((match (fussy-avy-orderless--find-word-in-text token sentence-text)))
+                                        (unless match
+                                          (setq all-match nil))))
+                                    ;; Find first token's position
+                                    (when all-match
+                                      (setq first-token-match
+                                            (fussy-avy-orderless--find-word-in-text first-token sentence-text)))
+                                    ;; If all tokens matched, add the first token's position
+                                    (when (and all-match first-token-match)
+                                      (let ((pos (+ sent-start (car first-token-match)))
+                                            (score (cdr first-token-match)))
+                                        (push (list pos test-win score) matches)))))))
                             matches))))
                ,@body)))
        (kill-buffer test-buf))))
@@ -313,6 +343,107 @@ with-eval-after-load, not unconditionally."
   (should (fboundp 'evil-fussy-avy-goto-char-timer))
   ;; Verify it's actually a function that calls fussy-avy-goto-char-timer
   (should (commandp 'evil-fussy-avy-goto-char-timer)))
+
+;;; Orderless Sentence Matching Tests
+;; New feature: space-separated tokens match within sentences (like orderless)
+;; All tokens must exist in the sentence, jump target = first token's position
+
+(ert-deftest fussy-avy-test-orderless-basic ()
+  "Basic case: 'fox meme' jumps to 'fox' when both words in sentence."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "fox meme")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-single-word ()
+  "Single word degrades to regular matching."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "fox")))
+      (should (>= (length matches) 1))
+      ;; Should find "fox" at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-token-order ()
+  "Token order in input doesn't matter for matching, first token = jump target."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "meme fox")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "meme" (first token) at position 18
+      (should (= 18 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-fuzzy-first-token ()
+  "Fuzzy matching works on first token."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "foz meme")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" (fuzzy match for "foz") at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-fuzzy-second-token ()
+  "Fuzzy matching works on second token."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "fox mem")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-fuzzy-both-tokens ()
+  "Fuzzy matching works on both tokens."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "foz mem")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-no-match-missing-token ()
+  "No match when a token is not in the sentence."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "fox elephant")))
+      (should (null matches)))))
+
+(ert-deftest fussy-avy-test-orderless-multiple-sentences-one-matches ()
+  "Only the sentence containing all tokens matches."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "the dog runs. a fox trout on a meme."
+    (let ((matches (fussy-avy-orderless--find-matches "fox meme")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" in second sentence at position 17
+      (should (= 17 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-multiple-sentences-same-word ()
+  "When first token appears in multiple sentences, only match sentence with all tokens."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox runs. a fox trout on a meme."
+    (let ((matches (fussy-avy-orderless--find-matches "fox meme")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" in SECOND sentence (position 15), not first
+      (should (= 15 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-three-tokens ()
+  "Three tokens all present in sentence."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "fox trout meme")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "fox" at position 3
+      (should (= 3 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-orderless-jump-to-first-token ()
+  "Always jump to first token position, even when matched out of order."
+  :tags '(orderless)
+  (fussy-avy-test--with-buffer "a fox trout on a meme"
+    (let ((matches (fussy-avy-orderless--find-matches "trout fox")))
+      (should (= 1 (length matches)))
+      ;; Should jump to "trout" (first token) at position 7
+      (should (= 7 (fussy-avy-test--match-pos (car matches)))))))
 
 (provide 'fussy-avy-test)
 ;;; fussy-avy-test.el ends here

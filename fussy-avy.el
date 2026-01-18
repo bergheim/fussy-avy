@@ -358,6 +358,116 @@ When `fussy-avy-all-windows' is non-nil, searches across multiple windows."
                    (cons (nth 0 m) (nth 1 m)))
                  matches)))))))
 
+;;; Orderless Sentence Matching
+
+(defun fussy-avy-orderless--split-tokens (input)
+  "Split INPUT into tokens by spaces."
+  (split-string input " " t))
+
+(defun fussy-avy-orderless--get-sentences-from-text (text start-offset)
+  "Get list of (start . end) for sentences in TEXT.
+START-OFFSET is added to positions to get buffer positions.
+Sentences are delimited by periods, exclamation marks, or question marks."
+  (let ((sentences '())
+        (pos 0)
+        (len (length text))
+        (sent-start 0))
+    (while (< pos len)
+      (let ((char (aref text pos)))
+        (when (memq char '(?. ?! ??))
+          (push (cons (+ start-offset sent-start)
+                      (+ start-offset pos 1))
+                sentences)
+          (setq sent-start (1+ pos))))
+      (setq pos (1+ pos)))
+    ;; Handle text without sentence ending (or final sentence)
+    (when (< sent-start len)
+      (push (cons (+ start-offset sent-start)
+                  (+ start-offset len))
+            sentences))
+    (nreverse sentences)))
+
+(defun fussy-avy-orderless--find-word-in-text (token text)
+  "Find TOKEN as a word in TEXT using fuzzy matching.
+Returns (position . score) of best match, or nil if no match.
+Searches at word boundaries for better accuracy."
+  (let ((best-match nil)
+        (token-len (length token)))
+    (with-temp-buffer
+      (insert text)
+      (goto-char (point-min))
+      ;; Search for each word in the text
+      (while (re-search-forward "\\b\\w+" nil t)
+        (let* ((word-start (match-beginning 0))
+               (word (match-string 0))
+               (word-len (length word)))
+          ;; Try to match token against this word (allow fuzzy)
+          (when (>= word-len token-len)
+            (let ((distance (fussy-avy--fussy-distance token word)))
+              (when (and distance
+                         (<= distance fussy-avy-max-distance)
+                         (or (null best-match)
+                             (< distance (cdr best-match))))
+                (setq best-match (cons (1- word-start) distance))))))))
+    best-match))
+
+(defun fussy-avy-orderless--find-matches-in-window (window input)
+  "Find orderless matches in WINDOW for INPUT.
+Returns list of (position window score) tuples."
+  (let* ((tokens (fussy-avy-orderless--split-tokens input))
+         (first-token (car tokens))
+         (matches '()))
+    (with-selected-window window
+      (save-excursion
+        (let* ((start (window-start))
+               (end (window-end nil t))
+               (text (buffer-substring-no-properties start end))
+               (sentences (fussy-avy-orderless--get-sentences-from-text text start)))
+          (dolist (sentence-bounds sentences)
+            (let* ((sent-start (car sentence-bounds))
+                   (sent-end (cdr sentence-bounds))
+                   (sentence-text (buffer-substring-no-properties sent-start sent-end))
+                   (all-match t)
+                   (first-token-match nil))
+              ;; Check if all tokens match in this sentence
+              (dolist (token tokens)
+                (let ((match (fussy-avy-orderless--find-word-in-text token sentence-text)))
+                  (unless match
+                    (setq all-match nil))))
+              ;; Find first token's position
+              (when all-match
+                (setq first-token-match
+                      (fussy-avy-orderless--find-word-in-text first-token sentence-text)))
+              ;; If all tokens matched, add the first token's position
+              (when (and all-match first-token-match)
+                (let ((pos (+ sent-start (car first-token-match)))
+                      (score (cdr first-token-match)))
+                  (push (list pos window score) matches))))))))
+    matches))
+
+(defun fussy-avy-orderless--find-matches (input)
+  "Find matches using orderless sentence matching.
+INPUT is split into tokens by spaces. All tokens must match within a sentence.
+Returns list of (position window score) for the first token in each matching sentence."
+  (let ((tokens (fussy-avy-orderless--split-tokens input)))
+    (if (null tokens)
+        nil
+      (if (= (length tokens) 1)
+          ;; Single token - use regular fussy matching
+          (fussy-avy--find-matches (car tokens))
+        ;; Multiple tokens - orderless sentence matching
+        (let ((matches '()))
+          (dolist (win (fussy-avy--get-windows))
+            (setq matches (nconc matches
+                                 (fussy-avy-orderless--find-matches-in-window win input))))
+          ;; Sort by score then position
+          (sort matches (lambda (a b)
+                          (let ((score-a (nth 2 a))
+                                (score-b (nth 2 b)))
+                            (if (= score-a score-b)
+                                (< (nth 0 a) (nth 0 b))
+                              (< score-a score-b))))))))))
+
 ;;; Evil Integration (optional)
 
 ;; Use `eval' to prevent byte-compiler from analyzing the evil-define-motion
