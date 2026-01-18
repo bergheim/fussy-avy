@@ -2,11 +2,11 @@
 
 ;; Copyright (C) 2026
 
-;; Author: Your Name
+;; Author: bergheim
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1") (avy "0.5.0"))
-;; Keywords: navigation, fussy, matching
-;; URL: https://github.com/your-username/fussy-avy
+;; Keywords: convenience, matching
+;; URL: https://github.com/bergheim/fussy-avy
 
 ;;; Commentary:
 
