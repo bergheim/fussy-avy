@@ -166,29 +166,6 @@ Returns the edit distance, or nil if target is too short."
    (t
     (window-list))))
 
-(defun fussy-avy--collect-candidates-in-window (window)
-  "Collect all potential jump targets in WINDOW.
-Returns list of (text position . window) for symbols/words."
-  (let ((candidates '())
-        (pattern "\\_<\\(\\sw\\|\\s_\\)+"))
-    (with-selected-window window
-      (save-excursion
-        (goto-char (window-start))
-        (while (re-search-forward pattern (window-end nil t) t)
-          (let ((text (match-string-no-properties 0))
-                (pos (match-beginning 0)))
-            (push (list text pos window) candidates)))))
-    (nreverse candidates)))
-
-(defun fussy-avy--collect-candidates ()
-  "Collect all potential jump targets in visible windows.
-Returns list of (text position . window) for symbols/words."
-  (let ((candidates '()))
-    (dolist (win (fussy-avy--get-windows))
-      (setq candidates (nconc candidates
-                              (fussy-avy--collect-candidates-in-window win))))
-    candidates))
-
 (defun fussy-avy--get-buffer-text-at (pos len &optional window)
   "Get LEN characters of buffer text starting at POS.
 If WINDOW is provided, get text from that window's buffer."
@@ -197,26 +174,36 @@ If WINDOW is provided, get text from that window's buffer."
         (buffer-substring-no-properties pos (min (+ pos len) (point-max))))
     (buffer-substring-no-properties pos (min (+ pos len) (point-max)))))
 
+(defun fussy-avy--find-matches-in-window (window input)
+  "Find all positions in WINDOW where INPUT fuzzily matches.
+Returns list of (position window score) tuples."
+  (let ((input-len (length input))
+        (matches '()))
+    (with-selected-window window
+      (save-excursion
+        (goto-char (window-start))
+        (let ((end (window-end nil t)))
+          (while (< (point) end)
+            (let* ((text (buffer-substring-no-properties
+                          (point)
+                          (min (+ (point) input-len) (point-max))))
+                   (distance (fussy-avy--fussy-distance input text)))
+              (when (and distance
+                         (or (< input-len fussy-avy-min-input-length)
+                             (<= distance fussy-avy-max-distance))
+                         (or (>= input-len fussy-avy-min-input-length)
+                             (= distance 0)))
+                (push (list (point) window distance) matches)))
+            (forward-char 1)))))
+    matches))
+
 (defun fussy-avy--find-matches (input)
   "Find all candidates matching INPUT in visible windows.
-Returns list of (position window . score) tuples, sorted by score."
+Returns list of (position window score) tuples, sorted by score."
   (when (> (length input) 0)
-    (let ((candidates (fussy-avy--collect-candidates))
-          (input-len (length input))
-          (matches '()))
-      (dolist (cand candidates)
-        (let* ((pos (nth 1 cand))
-               (window (nth 2 cand))
-               ;; Compare against buffer text at position
-               (buffer-text (fussy-avy--get-buffer-text-at pos input-len window))
-               (distance (fussy-avy--fussy-distance input buffer-text)))
-          (when (and distance
-                     (or (< input-len fussy-avy-min-input-length)
-                         (<= distance fussy-avy-max-distance)))
-            ;; For short input, only accept exact prefix (distance 0)
-            (when (or (>= input-len fussy-avy-min-input-length)
-                      (= distance 0))
-              (push (list pos window distance) matches)))))
+    (let ((matches '()))
+      (dolist (win (fussy-avy--get-windows))
+        (setq matches (nconc matches (fussy-avy--find-matches-in-window win input))))
       ;; Sort by score (lower is better), then by position
       (sort matches (lambda (a b)
                       (let ((score-a (nth 2 a))

@@ -120,33 +120,34 @@
            (goto-char (point-min))
            (let ((fussy-avy-all-windows nil)
                  (test-win (selected-window)))
-             (cl-letf (((symbol-function 'window-start)
-                        (lambda (&optional _) (point-min)))
-                       ((symbol-function 'window-end)
-                        (lambda (&optional _ _) (point-max)))
-                       ((symbol-function 'window-buffer)
-                        (lambda (&optional _) test-buf))
-                       ((symbol-function 'fussy-avy--collect-candidates-in-window)
-                        (lambda (_win)
-                          ;; Collect from test buffer directly
-                          (let ((candidates '())
-                                (pattern "\\_<\\(\\sw\\|\\s_\\)+"))
-                            (with-current-buffer test-buf
-                              (save-excursion
-                                (goto-char (point-min))
-                                (while (re-search-forward pattern (point-max) t)
-                                  (push (list (match-string-no-properties 0)
-                                              (match-beginning 0)
-                                              test-win)
-                                        candidates))))
-                            (nreverse candidates))))
-                       ((symbol-function 'fussy-avy--get-windows)
+             (cl-letf (((symbol-function 'fussy-avy--get-windows)
                         (lambda () (list test-win)))
                        ((symbol-function 'fussy-avy--get-buffer-text-at)
                         (lambda (pos len &optional _win)
                           (with-current-buffer test-buf
                             (buffer-substring-no-properties
-                             pos (min (+ pos len) (point-max)))))))
+                             pos (min (+ pos len) (point-max))))))
+                       ((symbol-function 'fussy-avy--find-matches-in-window)
+                        (lambda (_win input)
+                          ;; Scan test buffer directly
+                          (let ((input-len (length input))
+                                (matches '()))
+                            (with-current-buffer test-buf
+                              (save-excursion
+                                (goto-char (point-min))
+                                (while (< (point) (point-max))
+                                  (let* ((text (buffer-substring-no-properties
+                                                (point)
+                                                (min (+ (point) input-len) (point-max))))
+                                         (distance (fussy-avy--fussy-distance input text)))
+                                    (when (and distance
+                                               (or (< input-len fussy-avy-min-input-length)
+                                                   (<= distance fussy-avy-max-distance))
+                                               (or (>= input-len fussy-avy-min-input-length)
+                                                   (= distance 0)))
+                                      (push (list (point) test-win distance) matches)))
+                                  (forward-char 1))))
+                            matches))))
                ,@body)))
        (kill-buffer test-buf))))
 
@@ -154,8 +155,10 @@
   "Basic matching in buffer."
   (fussy-avy-test--with-buffer "aaa bbb foobar"
     (let ((matches (fussy-avy--find-matches "foo")))
-      (should (= 1 (length matches)))
-      (should (= 9 (fussy-avy-test--match-pos (car matches)))))))
+      (should (>= (length matches) 1))
+      ;; Best match (first after sorting) should be exact at position 9
+      (should (= 9 (fussy-avy-test--match-pos (car matches))))
+      (should (= 0 (fussy-avy-test--match-score (car matches)))))))
 
 (ert-deftest fussy-avy-test-find-matches-fussy ()
   "Fussy matching finds typo'd input."
@@ -193,6 +196,30 @@
       (should (>= (length matches) 1))
       ;; First match should be exact (score 0)
       (should (= 0 (fussy-avy-test--match-score (car matches)))))))
+
+(ert-deftest fussy-avy-test-find-matches-mid-symbol ()
+  "Matches text in the middle of symbols, not just at start."
+  (fussy-avy-test--with-buffer "fussy-avy-min-input-length"
+    (let ((matches (fussy-avy--find-matches "avy")))
+      (should (>= (length matches) 1))
+      ;; Should find 'avy' at position 7 (inside fussy-avy-...)
+      (should (= 7 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-find-matches-mid-symbol-with-space ()
+  "Matches 'avy min' inside 'fussy-avy-min-input-length'."
+  (fussy-avy-test--with-buffer "fussy-avy-min-input-length"
+    (let ((matches (fussy-avy--find-matches "avy min")))
+      (should (>= (length matches) 1))
+      ;; Should find 'avy-min' at position 7
+      (should (= 7 (fussy-avy-test--match-pos (car matches)))))))
+
+(ert-deftest fussy-avy-test-find-matches-anywhere ()
+  "Matches can be found anywhere in text, not just symbol boundaries."
+  (fussy-avy-test--with-buffer "the quick brown fox"
+    (let ((matches (fussy-avy--find-matches "ick")))
+      (should (>= (length matches) 1))
+      ;; Should find 'ick' at position 7 (inside 'quick')
+      (should (= 7 (fussy-avy-test--match-pos (car matches)))))))
 
 ;;; Multi-Window Tests
 
@@ -239,8 +266,8 @@
   (fussy-avy-test--with-buffer "foobar baz"
     (let* ((matches (fussy-avy--find-matches "foo"))
            (prompt (fussy-avy--format-prompt "foo" matches)))
-      ;; Should show count
-      (should (string-match-p "\\[1" prompt))
+      ;; Should show count (at least 1)
+      (should (string-match-p "\\[[0-9]" prompt))
       ;; Should show preview of matched text
       (should (string-match-p "foobar" prompt))
       ;; Should show input
