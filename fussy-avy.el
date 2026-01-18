@@ -400,6 +400,29 @@ Returns list of (display-string . (pos window score)) for each match."
 
 (declare-function consult--read "consult")
 
+(defun fussy-avy--consult-state ()
+  "State function for `consult-fussy-avy' to preview candidates."
+  (let (saved-pos saved-window)
+    (lambda (action cand)
+      (pcase action
+        ('setup
+         (setq saved-pos (point-marker)
+               saved-window (selected-window)))
+        ('preview
+         (when cand
+           (let ((pos (nth 0 cand))
+                 (window (nth 1 cand)))
+             (when (and window (window-live-p window))
+               (select-window window)
+               (goto-char pos)))))
+        ('return
+         cand)
+        ('exit
+         (when (and saved-window (window-live-p saved-window))
+           (select-window saved-window))
+         (when (marker-buffer saved-pos)
+           (goto-char saved-pos)))))))
+
 ;;;###autoload
 (defun consult-fussy-avy ()
   "Jump to a symbol using consult with fussy-avy candidates.
@@ -415,6 +438,7 @@ This provides a completing-read interface to buffer symbols."
                     :history 'fussy-avy--consult-history
                     :require-match t
                     :lookup #'fussy-avy--consult-lookup
+                    :state (fussy-avy--consult-state)
                     :sort nil)))
     (when selected
       (let ((pos (nth 0 selected))
