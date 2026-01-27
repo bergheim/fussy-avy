@@ -1,6 +1,9 @@
 # Test dependencies
 .deps/
 
+# Dev container
+.devcontainer/
+
 # Byte-compiled files
 *.elc
 
